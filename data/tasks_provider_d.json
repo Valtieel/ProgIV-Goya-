@@ -1,0 +1,5 @@
+[
+    {"title": "Escribir tests unitarios", "priority": "media", "status": "pendiente"},
+    {"priority": "alta", "status": "pendiente"},
+    {"title": "Documentar API", "priority": "baja", "status": "pendiente"}
+]
