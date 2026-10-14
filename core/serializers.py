@@ -1,6 +1,7 @@
 from datetime import date
 from rest_framework import serializers
 from .models import Project, Task, Tag
+from .services import HolidayService
 
 
 class TagSerializer(serializers.ModelSerializer):
@@ -12,12 +13,24 @@ class TagSerializer(serializers.ModelSerializer):
 class TaskSerializer(serializers.ModelSerializer):
     tags = TagSerializer(many=True, read_only=True)
 
+    # Campo calculado: no es una columna de la base, se arma al serializar.
+    # DRF lo llena llamando al método get_due_on_holiday (get_<nombre_del_campo>).
+    due_on_holiday = serializers.SerializerMethodField()
+
     class Meta:
         model = Task
         fields = [
             "id", "project", "title", "description",
-            "priority", "status", "due_date", "tags", "created_at",
+            "priority", "status", "due_date", "due_on_holiday",
+            "tags", "created_at",
         ]
+
+    def get_due_on_holiday(self, obj):
+        # Sin fecha límite no puede caer en feriado
+        if not obj.due_date:
+            return False
+        # Consulta el servicio de feriados (usa caché, así que no llama a la red cada vez)
+        return HolidayService.is_holiday(obj.due_date)
 
     def validate_due_date(self, value):
         # DRF llama automáticamente a validate_<campo> para validar un campo puntual.
@@ -34,8 +47,8 @@ class TaskSerializer(serializers.ModelSerializer):
                 "No se puede marcar una tarea como completada sin fecha límite registrada."
             )
 
-        # Nueva validación: no se puede pasar una tarea a "en_progreso" si el
-        # proyecto todavía no tiene ninguna tarea marcada como "completada".
+        # No se puede pasar una tarea a "en_progreso" si el proyecto todavía
+        # no tiene ninguna tarea marcada como "completada".
         if data.get("status") == "en_progreso":
             # El project puede venir en 'data' (creación o cambio de proyecto), o si
             # no vino en este request (ej. un PATCH que solo cambia el status),
