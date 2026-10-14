@@ -1,4 +1,6 @@
+from django.conf import settings
 from django.db import models
+
 
 class Project(models.Model):
     # Un proyecto agrupa varias tareas (relación uno a muchos con Task)
@@ -40,6 +42,12 @@ class Task(models.Model):
     # ManyToManyField: una tarea puede tener varios tags, y un tag estar en varias tareas.
     # Django crea automáticamente una tabla intermedia por detrás para esta relación.
     tags = models.ManyToManyField(Tag, blank=True, related_name="tasks")
+
+    # Dueño de la tarea. settings.AUTH_USER_MODEL es la forma recomendada de apuntar
+    # al modelo de usuario. null=True porque las tareas viejas todavía no tienen dueño.
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="tasks", null=True
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
 
