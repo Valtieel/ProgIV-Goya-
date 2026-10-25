@@ -1,18 +1,30 @@
+import logging
+
 from django.contrib.auth.models import User
 from django.db import transaction
 from django.http import JsonResponse
 from rest_framework import generics, permissions, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
+from rest_framework.exceptions import (
+    AuthenticationFailed,
+    NotFound,
+    PermissionDenied,
+    ValidationError,
+)
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework_simplejwt.views import TokenObtainPairView
 
-from .models import Project, ProjectMembership
+from .models import Project, ProjectMembership, SecurityLog
 from .permissions import IsProjectAdminOrReadOnly
 from .repositories import TaskRepository
 from .serializers import ProjectSerializer, TaskSerializer
 from .serializers_auth import RegisterSerializer
 from .services import MembershipService, ProjectService, TaskService
+from .throttles import LoginRateThrottle
+
+# Logger "security": configurado en LOGGING (settings.py), escribe en security.log
+security_logger = logging.getLogger("security")
 
 
 def health_check(request):
@@ -21,6 +33,27 @@ def health_check(request):
 
 def health_version(request):
     return JsonResponse({"version": "0.1.0"})
+
+
+class ThrottledTokenObtainPairView(TokenObtainPairView):
+    # Reemplaza, solo para esta vista, los throttles globales por el del login (5/minuto por IP)
+    throttle_classes = [LoginRateThrottle]
+
+    def post(self, request, *args, **kwargs):
+        try:
+            # Ejecuta el login original de simplejwt
+            return super().post(request, *args, **kwargs)
+        except AuthenticationFailed:
+            # Credenciales incorrectas: lo registramos y volvemos a lanzar la excepción
+            # tal cual, así el cliente sigue recibiendo el mismo 401 de siempre.
+            ip = request.META.get("REMOTE_ADDR")
+            username = request.data.get("username", "")
+            # Nunca registramos la contraseña, ni siquiera la incorrecta
+            SecurityLog.objects.create(
+                action="login_failed", detail=f"usuario={username}", ip_address=ip
+            )
+            security_logger.warning(f"Login fallido para usuario {username} desde {ip}")
+            raise
 
 
 class ProjectViewSet(viewsets.ModelViewSet):

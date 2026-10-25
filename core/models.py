@@ -71,3 +71,19 @@ class Task(models.Model):
 
     def __str__(self):
         return f"{self.title} ({self.project.name})"
+
+
+class SecurityLog(models.Model):
+    # Registro de auditoría: guarda eventos sensibles (logins fallidos, accesos denegados).
+    # SET_NULL: si se borra el usuario, el registro queda pero con user vacío.
+    # No queremos perder el historial de seguridad porque se eliminó una cuenta.
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL
+    )
+    action = models.CharField(max_length=100)  # ej: "login_failed", "permission_denied"
+    detail = models.CharField(max_length=255, blank=True)  # información extra en texto libre
+    ip_address = models.GenericIPAddressField(null=True, blank=True)  # valida que sea una IP
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.created_at:%Y-%m-%d %H:%M} {self.action} ({self.ip_address})"

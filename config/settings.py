@@ -29,7 +29,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "127.0.0.1,localhost").split(",")
 
 
 # Application definition
@@ -138,20 +138,48 @@ REST_FRAMEWORK = {
         "rest_framework.filters.OrderingFilter",
         "rest_framework.filters.SearchFilter",
     ],
-    # Formas de reconocer al usuario, en orden. JWT va primero para que una
-    # petición sin credenciales responda 401 y no 403.
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework_simplejwt.authentication.JWTAuthentication",
         "rest_framework.authentication.SessionAuthentication",
     ],
-    # Seguro por defecto: toda la API exige estar autenticado
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
     ],
+    # Límite de peticiones (rate limiting). Al superarlo: 429 + header Retry-After
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",   # anónimos, contados por IP
+        "rest_framework.throttling.UserRateThrottle",   # autenticados, contados por usuario
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "20/minute",
+        "user": "100/minute",
+        "login": "5/minute",  # lo usa LoginRateThrottle (core/throttles.py)
+    },
 }
 
-SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
-    "ROTATE_REFRESH_TOKENS": True,
+# --- Seguridad (Clase 8) ---
+INSTALLED_APPS += ["corsheaders"]
+
+# CorsMiddleware tiene que ir primero en la lista, antes de CommonMiddleware.
+# insert(0, ...) lo pone al principio sin tocar el resto de MIDDLEWARE.
+MIDDLEWARE.insert(0, "corsheaders.middleware.CorsMiddleware")
+
+# Solo estos orígenes pueden leer respuestas de la API desde un navegador.
+# Nunca usar CORS_ALLOW_ALL_ORIGINS = True en producción.
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "https://taskflow-app.com",
+]
+
+# Auditoría en archivo: queda aunque se comprometa la base de datos
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "file": {"class": "logging.FileHandler", "filename": BASE_DIR / "security.log"},
+    },
+    "loggers": {
+        # nivel WARNING: guarda warning o más grave, ignora los mensajes informativos
+        "security": {"handlers": ["file"], "level": "WARNING"},
+    },
 }

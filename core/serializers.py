@@ -1,5 +1,8 @@
 from datetime import date
+
+import nh3
 from rest_framework import serializers
+
 from .models import Project, Task, Tag
 from .services import HolidayService
 
@@ -31,6 +34,12 @@ class TaskSerializer(serializers.ModelSerializer):
             return False
         # Consulta el servicio de feriados (usa caché, así que no llama a la red cada vez)
         return HolidayService.is_holiday(obj.due_date)
+
+    def validate_description(self, value):
+        # Sanitización contra XSS: en vez de rechazar el valor, lo limpiamos.
+        # tags=set() significa "ninguna etiqueta HTML permitida" (lista blanca vacía).
+        # Además borra por completo el contenido de las peligrosas, como <script>.
+        return nh3.clean(value, tags=set())
 
     def validate_due_date(self, value):
         # DRF llama automáticamente a validate_<campo> para validar un campo puntual.
