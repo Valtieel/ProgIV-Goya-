@@ -1,7 +1,8 @@
 from django.contrib import admin
-from .models import Project, Task, Tag
+from .models import Project, Task, Tag, ProjectMembership
 
-# aca tenemos los 3 modelos registrados, estos los vamos a poder gestionar desde el panel de /admin despues
+# Registramos los modelos para poder gestionarlos desde el panel /admin/
 admin.site.register(Project)
 admin.site.register(Task)
 admin.site.register(Tag)
+admin.site.register(ProjectMembership)

@@ -12,6 +12,25 @@ class Project(models.Model):
         return self.name
 
 
+class ProjectMembership(models.Model):
+    # Une a un usuario con un proyecto y le da un rol dentro de ese proyecto.
+    # Así una misma persona puede ser admin en un proyecto y miembro en otro.
+    ROLE_CHOICES = [("admin", "Administrador"), ("miembro", "Miembro")]
+
+    # "Project" entre comillas: Django lo resuelve al final, sin importar el orden del archivo
+    project = models.ForeignKey("Project", on_delete=models.CASCADE, related_name="memberships")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    # Por mínimo privilegio, el rol por defecto es "miembro" y no "admin"
+    role = models.CharField(max_length=10, choices=ROLE_CHOICES, default="miembro")
+
+    class Meta:
+        # La base de datos impide que un usuario tenga dos membresías en el mismo proyecto
+        unique_together = ("project", "user")
+
+    def __str__(self):
+        return f"{self.user} - {self.project} ({self.role})"
+
+
 class Tag(models.Model):
     # Etiqueta reutilizable entre varias tareas (ej: "urgente", "backend")
     name = models.CharField(max_length=50, unique=True)  # no puede haber dos tags iguales
@@ -43,8 +62,7 @@ class Task(models.Model):
     # Django crea automáticamente una tabla intermedia por detrás para esta relación.
     tags = models.ManyToManyField(Tag, blank=True, related_name="tasks")
 
-    # Dueño de la tarea. settings.AUTH_USER_MODEL es la forma recomendada de apuntar
-    # al modelo de usuario. null=True porque las tareas viejas todavía no tienen dueño.
+    # Quién creó la tarea. Con las membresías ya no da acceso, queda como registro.
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="tasks", null=True
     )

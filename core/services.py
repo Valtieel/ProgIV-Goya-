@@ -4,7 +4,7 @@ from django.db.models import Count
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
-from .models import Task
+from .models import Project, ProjectMembership, Task
 from .repositories import TaskRepository
 
 
@@ -35,7 +35,6 @@ class ProjectService:
     @staticmethod
     def project_summary(project) -> dict:
         # Una sola consulta: agrupa las tareas del proyecto por status y cuenta cada grupo
-        # Devuelve algo como [{"status": "pendiente", "total": 2}, ...]
         filas = project.tasks.values("status").annotate(total=Count("id"))
 
         # Arrancamos con los tres estados en 0, así el resultado siempre
@@ -76,3 +75,23 @@ class HolidayService:
     @classmethod
     def is_holiday(cls, some_date) -> bool:
         return str(some_date) in cls.get_holidays(some_date.year)
+
+
+class MembershipService:
+    # Única fuente de verdad para las preguntas de membresía. La usan los permisos
+    # (Clase 7), y más adelante los WebSockets (Clase 10) y GraphQL (Clase 11).
+
+    @staticmethod
+    def is_member(user, project) -> bool:
+        # filter acepta un objeto Project o directamente su id
+        return ProjectMembership.objects.filter(project=project, user=user).exists()
+
+    @staticmethod
+    def is_admin(user, project) -> bool:
+        return ProjectMembership.objects.filter(project=project, user=user, role="admin").exists()
+
+    @staticmethod
+    def projects_for(user):
+        # Proyectos donde el usuario tiene alguna membresía.
+        # distinct() evita repetidos y order_by("id") mantiene estable la paginación.
+        return Project.objects.filter(memberships__user=user).distinct().order_by("id")
