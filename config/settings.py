@@ -183,3 +183,22 @@ LOGGING = {
         "security": {"handlers": ["file"], "level": "WARNING"},
     },
 }
+
+# --- Tiempo real (Clase 9) ---
+
+# daphne tiene que ir ANTES de django.contrib.staticfiles: reemplaza su versión de
+# runserver para que el mismo comando sirva HTTP y WebSocket. insert(0, ...) lo pone
+# primero sin tocar el resto de la lista.
+INSTALLED_APPS.insert(0, "daphne")
+INSTALLED_APPS += ["channels"]
+
+# Punto de entrada de la aplicación asincrónica: la variable "application" de config/asgi.py
+ASGI_APPLICATION = "config.asgi.application"
+
+# Channel layer: el "pizarrón" donde las conexiones se anotan en grupos y se pasan mensajes.
+# En memoria alcanza para desarrollar con un solo proceso. En la Clase 10 pasa a Redis.
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer",
+    },
+}
